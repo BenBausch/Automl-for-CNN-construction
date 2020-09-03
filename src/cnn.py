@@ -81,6 +81,7 @@ class torchModel(nn.Module):
 
     def get_crit(self):
         pass
+
     # generate input sample and forward to get shape
     def _get_conv_output(self, shape):
         bs = 1

@@ -12,13 +12,222 @@ from torchsummary import summary
 from torchvision.datasets import ImageFolder
 
 from cnn import torchModel
+from population import *
+from utils import get_optim, get_crit
+
+
+def init_population(population,
+               img_width,
+               img_height,
+               batch_size,
+               num_epochs,
+               learning_rate,
+               train_criterion,
+               cv,
+               data,
+               device,
+               save_model_str):
+    """
+    Initializes population with 5 different networks, that should be spread over the config space as far as possible.
+    """
+    # large amount of conv parameters, small amount of fc parameters
+    config1 = {
+        'optimizer': 0.2,
+        'criterion': 0.2,
+        'n_conv_layers': 3,
+        'n_channels_conv_0': 2048,
+        'n_channels_conv_1': 2048,
+        'n_channels_conv_2': 2048,
+        'kernel_size': 3,
+        'global_avg_pooling': False,
+        'use_BN': True,
+        'n_fc_layers': 1,
+        'n_channels_fc_0': 1,
+        'n_channels_fc_1': 1,
+        'n_channels_fc_2': 1}
+
+    # large amount of fc parameters, small amount of conv parameters
+    config2 = {
+    'optimizer': 0.4,
+    'criterion': 0.4,
+    'n_conv_layers': 3,
+    'n_channels_conv_0': 256,
+    'n_channels_conv_1': 256,
+    'n_channels_conv_2': 256,
+    'kernel_size': 1,
+    'global_avg_pooling': True,
+    'use_BN': False,
+    'n_fc_layers': 3,
+    'n_channels_fc_0': 50,
+    'n_channels_fc_1': 50,
+    'n_channels_fc_2': 50}
+
+    # config3 and config4 +- medium amount of parameters overall
+    # differ in the other settings
+    config3 = {
+    'optimizer': 0.6,
+    'criterion': 0.6,
+    'n_conv_layers': 2,
+    'n_channels_conv_0': 1200,
+    'n_channels_conv_1': 1200,
+    'kernel_size': 5,
+    'global_avg_pooling': True,
+    'use_BN': False,
+    'n_fc_layers':1,
+    'n_channels_fc_0': 25}
+
+    config4 = {
+    'optimizer': 0.8,
+    'criterion': 0.8,
+    'n_conv_layers':1,
+    'n_channels_conv_0':900,
+    'kernel_size':1,
+    'global_avg_pooling': False,
+    'use_BN': True,
+    'n_fc_layers':2,
+    'n_channels_fc_0':25,
+    'n_channels_fc_1': 25}
+
+    # default config of the project
+    config5 = {
+        'optimizer': 0.4,
+        'criterion': 0.4,
+        'n_conv_layers': 2,
+        'n_channels_conv_0': 457,
+        'n_channels_conv_1': 511,
+        'n_channels_conv_2': 38,
+        'kernel_size': 5,
+        'global_avg_pooling': True,
+        'use_BN': False,
+        'n_fc_layers': 3,
+        'n_channels_fc_0': 27,
+        'n_channels_fc_1': 17,
+        'n_channels_fc_2': 273}
+
+    configs = [config1, config2, config3, config4, config5]
+
+    print('Initalizing the population: ')
+
+    for config in configs:
+        train_loop(
+               population,
+               img_width,
+               img_height,
+               batch_size,
+               num_epochs,
+               learning_rate,
+               train_criterion,
+               cv,
+               data,
+               config,
+               device,
+               save_model_str)
+
+
+def train_loop(population,
+               img_width,
+               img_height,
+               batch_size,
+               num_epochs,
+               learning_rate,
+               train_criterion,
+               cv,
+               data,
+               model_config,
+               device,
+               save_model_str):
+    """
+    Trains model and additionally it adds the model wrapped as candidate member to the population.
+    :param cv: crossvalidation algorithm
+    :param data:
+    :param config:
+    :return:
+    """
+    score = []
+    model = None
+    for train_idx, valid_idx in cv.split(data, data.targets):
+
+        train_data = Subset(data, train_idx)
+        test_dataset = Subset(data, valid_idx)
+
+        # image size
+        input_shape = (3, img_width, img_height)
+
+        # Make data batch iterable
+        # Could modify the sampler to not uniformly random sample
+        train_loader = DataLoader(dataset=train_data,
+                                  batch_size=batch_size,
+                                  shuffle=True)
+        test_loader = DataLoader(dataset=test_dataset,
+                                 batch_size=batch_size,
+                                 shuffle=False)
+
+        model = torchModel(model_config,
+                           input_shape=input_shape,
+                           num_classes=len(data.classes)).to(device)
+
+        # THIS HERE IS THE SECOND OBJECTIVE YOU HAVE TO OPTIMIZE
+        # THIS HERE IS THE SECOND OBJECTIVE YOU HAVE TO OPTIMIZE
+        # THIS HERE IS THE SECOND OBJECTIVE YOU HAVE TO OPTIMIZE
+        total_model_params = np.sum(p.numel() for p in model.parameters())
+        # THIS HERE IS THE SECOND OBJECTIVE YOU HAVE TO OPTIMIZE
+        # THIS HERE IS THE SECOND OBJECTIVE YOU HAVE TO OPTIMIZE
+        # THIS HERE IS THE SECOND OBJECTIVE YOU HAVE TO OPTIMIZE
+        # instantiate optimizer
+        optimizer = get_optim(model_config['optimizer'])(model.parameters(),
+                                    lr=learning_rate)
+
+        # Just some info for you to see the generated network.
+        logging.info('Generated Network:')
+        summary(model, input_shape,
+                device='cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Train the model
+        for epoch in range(num_epochs):
+            logging.info('#' * 50)
+            logging.info('Epoch [{}/{}]'.format(epoch + 1, num_epochs))
+
+            train_score, train_loss = model.train_fn(optimizer, train_criterion, train_loader, device)
+            test_score = model.eval_fn(test_loader, device)
+
+            logging.info('Split-Train accuracy %f', train_score)
+            logging.info('Split-Test accuracy %f', test_score)
+
+    # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+    # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+    # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+    score.append(test_score)
+    # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+    # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+    # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+
+    if save_model_str:
+        # Save the model checkpoint can be restored via "model = torch.load(save_model_str)"
+        if os.path.exists(save_model_str):
+            save_model_str += '_'.join(time.ctime())
+        torch.save(model.state_dict(), save_model_str)
+
+    # add to population
+    candidate = Candidate(1 - np.mean(score),
+                          total_model_params,
+                          config=model_config,
+                          model = model)
+
+    population.add_candidate(candidate)
+
+    # RESULTING SCORES FOR BOTH OBJECTIVES
+    # RESULTING SCORES FOR BOTH OBJECTIVES
+    # RESULTING SCORES FOR BOTH OBJECTIVES
+    print('Resulting Model Score:')
+    print('negative acc [%] | #num model parameters')
+    print(1 - np.mean(score), total_model_params)
 
 
 
 
-def main(model_config,
-         data_dir,
+def main(data_dir,
          num_epochs=10,
+         num_generations=2,
          batch_size=50,
          learning_rate=0.001,
          train_criterion=torch.nn.CrossEntropyLoss,
@@ -39,6 +248,72 @@ def main(model_config,
     :param save_model_str:
     :return:
     """
+    # Device configuration
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    img_width = 16
+    img_height = 16
+    # data_augmentations = [transforms.Resize([img_width, img_height]),
+    #                      transforms.ToTensor()]
+    if data_augmentations is None:
+        # You can add any preprocessing/data augmentation you want here
+        data_augmentations = transforms.ToTensor()
+    elif isinstance(data_augmentations, list):
+        data_augmentations = transforms.Compose(data_augmentations)
+    elif not isinstance(data_augmentations, transforms.Compose):
+        raise NotImplementedError
+
+    # Load the dataset
+    data = ImageFolder(data_dir, transform=data_augmentations)
+
+    cv = StratifiedKFold(n_splits=2, random_state=42, shuffle=True)  # to make CV splits consistent
+
+    # instantiate training criterion and population
+    train_criterion = train_criterion().to(device)
+
+    population = Population()
+
+    init_population(population,
+               img_width,
+               img_height,
+               batch_size,
+               num_epochs,
+               learning_rate,
+               train_criterion,
+               cv,
+               data,
+               device,
+               save_model_str)
+
+    for g in range(num_generations):
+        num_children = 5
+        # get 5 parents and randomly select parent tuples for
+        candidates = list(population.sample_by_dist_prop_to_size_then_tournament(num_children))
+        index_tupels = []
+        for i in range(len(candidates)):
+            for j in range(i + 1, len(candidates)):
+                index_tupels.append((i,j))
+        indexes = np.random.choice([i for i in range(len(index_tupels))], len(candidates), replace=False)
+        choice = [index_tupels[i] for i in indexes]
+        for c in choice:
+            child_config = population.produce_child(candidates[c[0]], candidates[c[1]])
+            train_loop(population,
+                       img_width,
+                       img_height,
+                       batch_size,
+                       num_epochs,
+                       learning_rate,
+                       train_criterion,
+                       cv,
+                       data,
+                       child_config,
+                       device,
+                       save_model_str)
+
+        population.plot_pareto_set(population.compute_pareto_set())
+
+
+
+
 
 
 
@@ -59,8 +334,12 @@ if __name__ == "__main__":
     cmdline_parser = argparse.ArgumentParser('AutoML SS20 final project')
 
     cmdline_parser.add_argument('-e', '--epochs',
-                                default=50,
+                                default=1,
                                 help='Number of epochs',
+                                type=int)
+    cmdline_parser.add_argument('-g', '--generations',
+                                default=10,
+                                help='Number of generations of generated of spring',
                                 type=int)
     cmdline_parser.add_argument('-b', '--batch_size',
                                 default=282,
@@ -102,26 +381,11 @@ if __name__ == "__main__":
         logging.warning('These will be ignored')
 
     # architecture parametrization
-    architecture = {
-        'optimizer': 0.4,
-        'criterion': 0.4,
-        'n_conv_layers': 2,
-        'n_channels_conv_0': 457,
-        'n_channels_conv_1': 511,
-        'n_channels_conv_2': 38,
-        'kernel_size': 5,
-        'global_avg_pooling': True,
-        'use_BN': False,
-        'n_fc_layers': 3,
-        'n_channels_fc_0': 27,
-        'n_channels_fc_1': 17,
-        'n_channels_fc_2': 273}
-
     main(
-        architecture,
         data_dir=args.data_dir,
         num_epochs=args.epochs,
         batch_size=args.batch_size,
+        num_generations=args.generations,
         learning_rate=args.learning_rate,
         data_augmentations=None,  # Not set in this example
         save_model_str=args.model_path

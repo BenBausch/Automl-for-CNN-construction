@@ -33,6 +33,38 @@ def accuracy(output, target, topk=(1,)):
   return res
 
 
+def get_borders(name_of_parameter):
+  borders = {
+    'optimizer': (float, [0,1]),
+    'criterion': (float, [0,1]),
+    'n_conv_layers': (int, [1,3]),
+    'n_channels_conv_0': (int, [256,2048]),
+    'n_channels_conv_1': (int, [256,2048]),
+    'n_channels_conv_2': (int, [256,2048]),
+    'kernel_size': (int, [1,5]),
+    'global_avg_pooling': (bool, [True, False]),
+    'use_BN': (bool, [True, False]),
+    'n_fc_layers': (int, [1,3]),
+    'n_channels_fc_0': (int, [1, 50]),
+    'n_channels_fc_1': (int, [1, 50]),
+    'n_channels_fc_2': (int, [1, 50])}
+  if name_of_parameter in borders.keys():
+    return borders[name_of_parameter]
+  return None
+
+
+def within_borders(value, borders):
+  """
+  Cuts the value to be within the borders if necessary.
+  """
+  if borders[0] > value:
+    return borders[0]
+  elif borders[1] < value:
+    return borders[1]
+  else:
+    return value
+
+
 def get_optim(optim_value):
   "handels the encoding of the opitmizers"
   if optim_value < 0 or optim_value > 1:

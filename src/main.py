@@ -108,7 +108,10 @@ def init_population(population,
 
     print('Initalizing the population: ')
 
-    for config in configs:
+    for i, config in enumerate(configs):
+        default = False
+        if i == 4:
+            default = True
         train_loop(
                population,
                img_width,
@@ -121,7 +124,8 @@ def init_population(population,
                data,
                config,
                device,
-               save_model_str)
+               save_model_str,
+               default)
 
 
 def train_loop(population,
@@ -135,7 +139,8 @@ def train_loop(population,
                data,
                model_config,
                device,
-               save_model_str):
+               save_model_str,
+               default):
     """
     Trains model and additionally it adds the model wrapped as candidate member to the population.
     :param cv: crossvalidation algorithm
@@ -200,18 +205,19 @@ def train_loop(population,
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
-
-    if save_model_str:
-        # Save the model checkpoint can be restored via "model = torch.load(save_model_str)"
-        if os.path.exists(save_model_str):
-            save_model_str += '_'.join(time.ctime())
-        torch.save(model.state_dict(), save_model_str)
-
-    # add to population
     candidate = Candidate(1 - np.mean(score),
                           total_model_params,
                           config=model_config,
-                          model = model)
+                          model=model)
+    if default:
+        population.default = candidate
+    if save_model_str:
+        # Save the model checkpoint can be restored via "model = torch.load(save_model_str)"
+        print('Saving model!')
+        if os.path.exists(save_model_str):
+            save_model_str += r'\model'
+            save_model_str += ''.join(str(candidate.id))
+        torch.save(model.state_dict(), save_model_str)
 
     population.add_candidate(candidate)
 
@@ -248,6 +254,7 @@ def main(data_dir,
     :param save_model_str:
     :return:
     """
+    start = time.time()
     # Device configuration
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     img_width = 16
@@ -265,7 +272,7 @@ def main(data_dir,
     # Load the dataset
     data = ImageFolder(data_dir, transform=data_augmentations)
 
-    cv = StratifiedKFold(n_splits=2, random_state=42, shuffle=True)  # to make CV splits consistent
+    cv = StratifiedKFold(n_splits=3, random_state=42, shuffle=True)  # to make CV splits consistent
 
     # instantiate training criterion and population
     train_criterion = train_criterion().to(device)
@@ -285,6 +292,9 @@ def main(data_dir,
                save_model_str)
 
     for g in range(num_generations):
+        if time.time() - start >= 86400:
+            population.plot_pareto_set(population.compute_pareto_set(), g)
+            break
         num_children = 5
         # get 5 parents and randomly select parent tuples for
         candidates = list(population.sample_by_dist_prop_to_size_then_tournament(num_children))
@@ -295,6 +305,8 @@ def main(data_dir,
         indexes = np.random.choice([i for i in range(len(index_tupels))], len(candidates), replace=False)
         choice = [index_tupels[i] for i in indexes]
         for c in choice:
+            if time.time() - start >= 86400:
+                break
             child_config = population.produce_child(candidates[c[0]], candidates[c[1]])
             train_loop(population,
                        img_width,
@@ -307,16 +319,10 @@ def main(data_dir,
                        data,
                        child_config,
                        device,
-                       save_model_str)
+                       save_model_str,
+                       False)
 
-        population.plot_pareto_set(population.compute_pareto_set())
-
-
-
-
-
-
-
+        population.plot_pareto_set(population.compute_pareto_set(), g)
 
 
 if __name__ == "__main__":
@@ -334,7 +340,7 @@ if __name__ == "__main__":
     cmdline_parser = argparse.ArgumentParser('AutoML SS20 final project')
 
     cmdline_parser.add_argument('-e', '--epochs',
-                                default=1,
+                                default=30,
                                 help='Number of epochs',
                                 type=int)
     cmdline_parser.add_argument('-g', '--generations',
@@ -364,7 +370,7 @@ if __name__ == "__main__":
                                 choices=list(opti_dict.keys()),
                                 type=str)
     cmdline_parser.add_argument('-m', '--model_path',
-                                default=None,
+                                default=r'.\src\models',
                                 help='Path to store model',
                                 type=str)
     cmdline_parser.add_argument('-v', '--verbose',

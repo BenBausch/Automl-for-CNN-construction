@@ -161,3 +161,4 @@ class torchModel(nn.Module):
                 t.set_description('(=> Test) Score: {:.4f}'.format(score.avg))
 
         return score.avg
+

@@ -18,6 +18,7 @@ class Candidate():
         self.size = size
         self.model = model
         self.init_configuration(config)
+        self.default = None
 
     def init_configuration(self, config):
         self.optimizer = config['optimizer']
@@ -194,11 +195,11 @@ class Population():
                 pareto_set.add(c)
         return pareto_set
 
-    def plot_pareto_set(self, pareto_set):
+    def plot_pareto_set(self, pareto_set, g):
 
         # size and score of the base model
-        size_b = [self.candidates[4].size]
-        score_b = [self.candidates[4].score]
+        size_b = [np.log(self.default.size)]
+        score_b = [self.default.score]
 
 
         # sizes/scores of candidates in the pareto front
@@ -212,10 +213,12 @@ class Population():
         plt.scatter(score_b, size_b, c='r', alpha=1)
         plt.scatter(scores_a, sizes_a, c='b', alpha=0.5)
         plt.scatter(scores_p, sizes_p, c='g', alpha=1)
-        plt.title('Scatter plot pythonspot.com')
-        plt.xlabel('size in log scale')
-        plt.ylabel('score')
-        plt.show()
+        plt.title('Pareto Front of Iteration ' + str(g))
+        plt.xlabel('Score')
+        plt.ylabel('Number Parameters in Log-Scale')
+        name = r'.\src\pareto_fronts\pareto_front_' + str(g)
+        plt.savefig(fname=name)
+
 
 
 """if __name__ == "__main__":

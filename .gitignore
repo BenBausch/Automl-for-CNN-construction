@@ -131,3 +131,5 @@ dmypy.json
 micro17flower/
 
 .idea/
+src/experiments
+src/models

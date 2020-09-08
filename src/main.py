@@ -3,6 +3,7 @@ import argparse
 import logging
 import time
 import numpy as np
+import jsonpickle
 from sklearn.model_selection import StratifiedKFold   # We use 3-fold stratified cross-validation
 
 import torch
@@ -14,7 +15,7 @@ from torchvision.datasets import ImageFolder
 from cnn import torchModel
 from population import *
 from utils import get_optim, get_crit
-
+from early_stopping import EarlyStopping
 
 def init_population(population,
                img_width,
@@ -30,7 +31,7 @@ def init_population(population,
     """
     Initializes population with 5 different networks, that should be spread over the config space as far as possible.
     """
-    # large amount of conv parameters, small amount of fc parameters
+    # max amount of parameters
     config1 = {
         'optimizer': 0.2,
         'criterion': 0.2,
@@ -42,25 +43,25 @@ def init_population(population,
         'global_avg_pooling': False,
         'use_BN': True,
         'n_fc_layers': 1,
-        'n_channels_fc_0': 1,
-        'n_channels_fc_1': 1,
-        'n_channels_fc_2': 1}
+        'n_channels_fc_0': 50,
+        'n_channels_fc_1': 50,
+        'n_channels_fc_2': 50}
 
-    # large amount of fc parameters, small amount of conv parameters
+    # min amount of paras for max num layers
     config2 = {
     'optimizer': 0.4,
     'criterion': 0.4,
     'n_conv_layers': 3,
-    'n_channels_conv_0': 256,
-    'n_channels_conv_1': 256,
-    'n_channels_conv_2': 256,
+    'n_channels_conv_0': 64,
+    'n_channels_conv_1': 64,
+    'n_channels_conv_2': 64,
     'kernel_size': 1,
     'global_avg_pooling': True,
     'use_BN': False,
     'n_fc_layers': 3,
-    'n_channels_fc_0': 50,
-    'n_channels_fc_1': 50,
-    'n_channels_fc_2': 50}
+    'n_channels_fc_0': 1,
+    'n_channels_fc_1': 1,
+    'n_channels_fc_2': 1}
 
     # config3 and config4 +- medium amount of parameters overall
     # differ in the other settings
@@ -152,6 +153,8 @@ def train_loop(population,
     model = None
     for train_idx, valid_idx in cv.split(data, data.targets):
 
+        early_stopping = EarlyStopping(patience=10, verbose=False)
+
         train_data = Subset(data, train_idx)
         test_dataset = Subset(data, valid_idx)
 
@@ -198,6 +201,12 @@ def train_loop(population,
             logging.info('Split-Train accuracy %f', train_score)
             logging.info('Split-Test accuracy %f', test_score)
 
+            early_stopping(test_score)
+
+            if early_stopping.early_stop:
+                print("Early stopping at iteration: %d" % epoch)
+                break
+
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
@@ -205,10 +214,14 @@ def train_loop(population,
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
     # THIS HERE IS PART OF THE FIRST OBJECTIVE YOU HAVE TO OPTIMIZE
+    ref_point = [np.log10(10 ** 8), 0]
+    hv = population.computeHV2D([[np.log10(total_model_params), 1 - np.mean(score)]], ref_point)
+
     candidate = Candidate(1 - np.mean(score),
                           total_model_params,
                           config=model_config,
-                          model=model)
+                          model=model,
+                          HV=hv)
     if default:
         population.default = candidate
     if save_model_str:
@@ -218,6 +231,10 @@ def train_loop(population,
             save_model_str += r'\model'
             save_model_str += ''.join(str(candidate.id))
         torch.save(model.state_dict(), save_model_str)
+        j = jsonpickle.encode(candidate.__dict__())
+        with open(save_model_str + '.json', 'w') as outfile:
+            outfile.write(j)
+
 
     population.add_candidate(candidate)
 
@@ -291,38 +308,81 @@ def main(data_dir,
                device,
                save_model_str)
 
+    use_size = True
     for g in range(num_generations):
         if time.time() - start >= 86400:
             population.plot_pareto_set(population.compute_pareto_set(), g)
             break
         num_children = 5
-        # get 5 parents and randomly select parent tuples for
-        candidates = list(population.sample_by_dist_prop_to_size_then_tournament(num_children))
-        index_tupels = []
-        for i in range(len(candidates)):
-            for j in range(i + 1, len(candidates)):
-                index_tupels.append((i,j))
-        indexes = np.random.choice([i for i in range(len(index_tupels))], len(candidates), replace=False)
-        choice = [index_tupels[i] for i in indexes]
-        for c in choice:
-            if time.time() - start >= 86400:
-                break
-            child_config = population.produce_child(candidates[c[0]], candidates[c[1]])
-            train_loop(population,
-                       img_width,
-                       img_height,
-                       batch_size,
-                       num_epochs,
-                       learning_rate,
-                       train_criterion,
-                       cv,
-                       data,
-                       child_config,
-                       device,
-                       save_model_str,
-                       False)
+
+        # if Hypervolume did not change within last few gens (controled in population.plot_paerto front)
+        # then randomize new children
+        if not(population.randomize):
+
+            # get 5 parents and randomly select parent tuples for
+            if (g + 1) % 4 == 0:
+                use_size = not (use_size)
+                population.use_size = use_size
+            if True:
+                #candidates = list(population.sample_by_dist_prop_to_size_then_tournament(num_children))
+                candidates = list(population.sample_by_hypervolume(num_children))
+            else:
+                candidates = list(population.sample_by_dist_prop_to_score_then_tournament(num_children))
+            index_tupels = []
+            for i in range(len(candidates)):
+                for j in range(i + 1, len(candidates)):
+                    index_tupels.append((i,j))
+            indexes = np.random.choice([i for i in range(len(index_tupels))], len(candidates), replace=False)
+            choice = [index_tupels[i] for i in indexes]
+            for c in choice:
+                if time.time() - start >= 86400:
+                    break
+                child_config = population.produce_child(candidates[c[0]], candidates[c[1]])
+                train_loop(population,
+                           img_width,
+                           img_height,
+                           batch_size,
+                           num_epochs,
+                           learning_rate,
+                           train_criterion,
+                           cv,
+                           data,
+                           child_config,
+                           device,
+                           save_model_str,
+                           False)
+
+        else:
+            #pareto = list(map(lambda x: x, iter(population.compute_pareto_set())))
+            for i in range(num_children):
+                #parent = np.random.choice(pareto)
+                child_config = population.sample_child_uniformly()
+                train_loop(population,
+                           img_width,
+                           img_height,
+                           batch_size,
+                           num_epochs,
+                           learning_rate,
+                           train_criterion,
+                           cv,
+                           data,
+                           child_config,
+                           device,
+                           save_model_str,
+                           False)
+        if save_model_str:
+            # Save the model checkpoint can be restored via "model = torch.load(save_model_str)"
+            print('Saving Population!')
+            if os.path.exists(save_model_str):
+                a = save_model_str
+                a += r'\population'
+                a += ''.join(str(g))
+            j = jsonpickle.encode(population.__dict__())
+            with open(a + '.json', 'w') as outfile:
+                outfile.write(j)
 
         population.plot_pareto_set(population.compute_pareto_set(), g)
+        population.kill_weak_candidates()
 
 
 if __name__ == "__main__":
@@ -340,15 +400,15 @@ if __name__ == "__main__":
     cmdline_parser = argparse.ArgumentParser('AutoML SS20 final project')
 
     cmdline_parser.add_argument('-e', '--epochs',
-                                default=30,
+                                default=50,
                                 help='Number of epochs',
                                 type=int)
     cmdline_parser.add_argument('-g', '--generations',
-                                default=10,
+                                default=30,
                                 help='Number of generations of generated of spring',
                                 type=int)
     cmdline_parser.add_argument('-b', '--batch_size',
-                                default=282,
+                                default=200,
                                 help='Batch size',
                                 type=int)
     cmdline_parser.add_argument('-D', '--data_dir',

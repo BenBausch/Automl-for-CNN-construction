@@ -35,6 +35,7 @@ def init_population(population,
     config1 = {
         'optimizer': 0.2,
         'criterion': 0.2,
+        'lr': learning_rate,
         'n_conv_layers': 3,
         'n_channels_conv_0': 2048,
         'n_channels_conv_1': 2048,
@@ -51,6 +52,7 @@ def init_population(population,
     config2 = {
     'optimizer': 0.4,
     'criterion': 0.4,
+    'lr': learning_rate,
     'n_conv_layers': 3,
     'n_channels_conv_0': 64,
     'n_channels_conv_1': 64,
@@ -68,6 +70,7 @@ def init_population(population,
     config3 = {
     'optimizer': 0.6,
     'criterion': 0.6,
+    'lr': learning_rate,
     'n_conv_layers': 2,
     'n_channels_conv_0': 1200,
     'n_channels_conv_1': 1200,
@@ -75,24 +78,26 @@ def init_population(population,
     'global_avg_pooling': True,
     'use_BN': False,
     'n_fc_layers':1,
-    'n_channels_fc_0': 25}
+    'n_channels_fc_0': 300}
 
     config4 = {
     'optimizer': 0.8,
     'criterion': 0.8,
+    'lr': learning_rate,
     'n_conv_layers':1,
     'n_channels_conv_0':900,
     'kernel_size':1,
     'global_avg_pooling': False,
     'use_BN': True,
     'n_fc_layers':2,
-    'n_channels_fc_0':25,
-    'n_channels_fc_1': 25}
+    'n_channels_fc_0':1,
+    'n_channels_fc_1': 50}
 
     # default config of the project
     config5 = {
         'optimizer': 0.4,
         'criterion': 0.4,
+        'lr': learning_rate,
         'n_conv_layers': 2,
         'n_channels_conv_0': 457,
         'n_channels_conv_1': 511,
@@ -317,17 +322,20 @@ def main(data_dir,
 
         # if Hypervolume did not change within last few gens (controled in population.plot_paerto front)
         # then randomize new children
-        if not(population.randomize):
-
+        if True:
             # get 5 parents and randomly select parent tuples for
-            if (g + 1) % 4 == 0:
-                use_size = not (use_size)
+            if g % 3 == 0:
+                use_size = True
                 population.use_size = use_size
-            if True:
-                #candidates = list(population.sample_by_dist_prop_to_size_then_tournament(num_children))
-                candidates = list(population.sample_by_hypervolume(num_children))
             else:
-                candidates = list(population.sample_by_dist_prop_to_score_then_tournament(num_children))
+                use_size = False
+                population.use_size = use_size
+            if use_size:
+                print('Sample Size')
+                candidates = list(population.sample_by_dist_prop_to_size_then_tournament(num_children))
+            else:
+                print('Sample HV')
+                candidates = list(population.sample_by_hypervolume(num_children))
             index_tupels = []
             for i in range(len(candidates)):
                 for j in range(i + 1, len(candidates)):

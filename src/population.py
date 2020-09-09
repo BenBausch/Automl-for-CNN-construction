@@ -86,7 +86,7 @@ class Population():
 
     def add_candidate(self, candidate):
         self.candidates.append(candidate)
-        if self.use_size:
+        if True:
             # use this line when sampling by size
             self.candidates.sort(key=lambda x: x.size, reverse=False)
         else:
@@ -138,7 +138,7 @@ class Population():
             # Get the candidate with best performance from the sampled candidates and remove its index from the possible
             # parent candidate of further children (prevent getting same candidate multiple times)
             tournement_candidates = list(map(lambda c:(possible_parents[c],c), candidates))
-            best_candidate, index = tournement_candidates[np.argmax(list(map(lambda c: c[0].score, tournement_candidates)))]
+            best_candidate, index = tournement_candidates[np.argmin(list(map(lambda c: c[0].score, tournement_candidates)))]
             print('Selected Candidate Id : %d and Score: %d and Size: %d' %
                   (best_candidate.id, best_candidate.score, best_candidate.size))
             possible_parents.pop(index)
@@ -231,14 +231,15 @@ class Population():
         # determine number filters by intermediate recombination of parents with flooring the value
         # uniform sample value within borders if not available
         for i in range(n_convs):
+            beta = np.random.normal(0.5, 0.5)
             try:
-                filter_size = int(0.5*(parent1.n_conv_filters[i] + parent2.n_conv_filters[i]))
+                filter_size = int(beta*(parent1.n_conv_filters[i] + parent2.n_conv_filters[i]))
             except:
                 borders = get_borders('n_channels_conv_' + str(i))[1]
                 try:
-                    filter_size = int(0.5 * (np.random.randint(borders[0], borders[1]) + parent2.n_conv_filters[i]))
+                    filter_size = int(beta * (np.random.randint(borders[0], borders[1]) + parent2.n_conv_filters[i]))
                 except:
-                    filter_size = int(0.5 * (parent1.n_conv_filters[i] + np.random.randint(borders[0], borders[1])))
+                    filter_size = int(beta * (parent1.n_conv_filters[i] + np.random.randint(borders[0], borders[1])))
 
             config['n_channels_conv_' + str(i)] = within_borders(filter_size, get_borders('n_channels_conv_' + str(i))[1])
 
@@ -250,14 +251,15 @@ class Population():
         # determine number channels by intermediate recombination of parents with flooring the value
         # uniform sample value within borders if not available
         for i in range(n_fcs):
+            beta = np.random.normal(0.5, 0.5)
             try:
-                num_channels = int(0.5 * (parent1.n_fc_channels[i] + parent2.n_fc_channels[i]))
+                num_channels = int(beta * (parent1.n_fc_channels[i] + parent2.n_fc_channels[i]))
             except:
                 borders = get_borders('n_channels_fc_' + str(i))[1]
                 try:
-                    num_channels = int(0.5 * (np.random.randint(borders[0], borders[1]) + parent2.n_fc_channels[i]))
+                    num_channels = int(beta * (np.random.randint(borders[0], borders[1]) + parent2.n_fc_channels[i]))
                 except:
-                    num_channels = int(0.5 * (parent1.n_fc_channels[i] + np.random.randint(borders[0], borders[1])))
+                    num_channels = int(beta * (parent1.n_fc_channels[i] + np.random.randint(borders[0], borders[1])))
 
             config['n_channels_fc_' + str(i)] = within_borders(num_channels, get_borders('n_channels_fc_' + str(i))[1])
 
@@ -278,8 +280,11 @@ class Population():
         config['kernel_size'] = np.random.randint(borders[0], borders[1])
 
         # choose global average pooling and batch normalization by applying logical AND
-        config['global_avg_pooling'] = parent1.global_avg_pooling and parent2.global_avg_pooling
-        config['use_BN'] = parent1.use_BN and parent2.use_BN
+        borders = get_borders('global_avg_pooling')[1]
+        config['global_avg_pooling'] = np.random.choice(borders, p=[0.5,0.5])
+        # increase prob to use bn, since generally known to yield better results
+        borders = get_borders('use_BN')[1]
+        config['use_BN'] = np.random.choice(borders, p=[0.7,0.3])
 
         return config
 

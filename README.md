@@ -11,7 +11,7 @@ Two baselines were given: orange baseline with hypervolume of  and the red basel
 I have choosen an evolutionary algorithm with 2 kinds of parent selection and multiple different recombination and mutation strategies to produce offspring.
 The first sampling algorithm did sample a tournemant group from a distibution proportional to the inverse size (smallest network more likely) and 
 then selected the best performing model as parent. The second parent selection algorithm did sample parents proportional to the hypervolume of the individual point w.r.t the same 
-reference point, thereby optimizing both cost functions at the same time. Training was done using early stopping with a patience of 10, so good configurations were very unlikly to stop early.
+reference point, thereby optimizing both cost functions at the same time. Training was done using early stopping with a patience of 10, so good configurations were very unlikely to stop too early.
 
 ## Results
 

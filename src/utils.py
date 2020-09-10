@@ -45,9 +45,9 @@ def get_borders(name_of_parameter):
     'global_avg_pooling': (bool, [True, False]),
     'use_BN': (bool, [True, False]),
     'n_fc_layers': (int, [1,3]),
-    'n_channels_fc_0': (int, [1, 300]),
-    'n_channels_fc_1': (int, [1, 300]),
-    'n_channels_fc_2': (int, [1, 300])}
+    'n_channels_fc_0': (int, [1, 273]),
+    'n_channels_fc_1': (int, [1, 273]),
+    'n_channels_fc_2': (int, [1, 273])}
   if name_of_parameter in borders.keys():
     return borders[name_of_parameter]
   return None

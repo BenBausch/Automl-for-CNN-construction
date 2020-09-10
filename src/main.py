@@ -2,6 +2,7 @@ import os
 import argparse
 import logging
 import time
+import re
 import numpy as np
 import jsonpickle
 from sklearn.model_selection import StratifiedKFold   # We use 3-fold stratified cross-validation
@@ -78,7 +79,7 @@ def init_population(population,
     'global_avg_pooling': True,
     'use_BN': False,
     'n_fc_layers':1,
-    'n_channels_fc_0': 300}
+    'n_channels_fc_0': 273}
 
     config4 = {
     'optimizer': 0.8,
@@ -132,6 +133,66 @@ def init_population(population,
                device,
                save_model_str,
                default)
+
+
+def load_last_population(path_to_last_pop,
+                     path_to_models,
+                     population,
+                     population_number):
+    f = open(path_to_last_pop + "\\" + "population" + str(population_number) + ".json").read()
+    population_dict = jsonpickle.decode(f)
+    # load all the models that are in the population
+    candidate_list = []
+    print("Searching for candiates: ")
+    print(population_dict['candidate_ids'])
+    cans = population_dict['candidate_ids']
+    default_in_cans = False
+    for i in cans:
+        if i == 4:
+            default_in_cans = True
+            break
+    # append default config
+    if not(default_in_cans):
+        cans.append(4)
+    # find max model id
+    max_id = 0
+    for filename in os.listdir(path_to_models):
+        if filename.endswith(".json") and filename.find('model') != -1:
+            id_found = int(re.findall('[0-9]+', filename)[0])
+            if id_found > max_id:
+                max_id = id_found
+    print("Max id found: %d" % max_id)
+    for i in population_dict['candidate_ids']:
+        for filename in os.listdir(path_to_models):
+            if filename.endswith(".json") and filename.find('model' + str(i) + ".") != -1:
+                print('Found Candiadate : ' + filename)
+                f = open(path_to_models + '\\' + filename).read()
+                c_d= jsonpickle.decode(f)
+                # load the torch model of the candidate:
+                model = torch.load(path_to_models + '\\' + filename[0:-5])
+                candidate = Candidate(score=c_d['score'],
+                                      size=c_d['size'],
+                                      config=c_d['config'],
+                                      model=model,
+                                      HV=c_d['HV'],
+                                      default=c_d['default'],
+                                      id=c_d['id'],
+                                      max_id=max_id
+                                      )
+                # only add default to cans is previously has been in cans
+                if i == 4 and default_in_cans:
+                    population.default = candidate
+                    candidate_list.append(candidate)
+                elif i == 4:
+                    population.default = candidate
+                else:
+                    candidate_list.append(candidate)
+    print(candidate_list)
+    population.candidates = candidate_list
+    population.use_size = population_dict['use_size']
+    population.randomize = population_dict['randomize']
+    population.generations_since_last_change_pareto = population_dict['gslcp']
+    population.HV = population_dict['HV']
 
 
 def train_loop(population,
@@ -251,8 +312,6 @@ def train_loop(population,
     print(1 - np.mean(score), total_model_params)
 
 
-
-
 def main(data_dir,
          num_epochs=10,
          num_generations=2,
@@ -261,7 +320,10 @@ def main(data_dir,
          train_criterion=torch.nn.CrossEntropyLoss,
          model_optimizer=torch.optim.Adam,
          data_augmentations=None,
-         save_model_str=None):
+         save_model_str=None,
+         path_to_population=None,
+         population_number=-1,
+         ):
     """
     Outter loop for the hyperparameter optimization and NAS.
 
@@ -300,21 +362,24 @@ def main(data_dir,
     train_criterion = train_criterion().to(device)
 
     population = Population()
-
-    init_population(population,
-               img_width,
-               img_height,
-               batch_size,
-               num_epochs,
-               learning_rate,
-               train_criterion,
-               cv,
-               data,
-               device,
-               save_model_str)
+    if path_to_population is None:
+        init_population(population,
+                   img_width,
+                   img_height,
+                   batch_size,
+                   num_epochs,
+                   learning_rate,
+                   train_criterion,
+                   cv,
+                   data,
+                   device,
+                   save_model_str)
+    else:
+        print("Loading last population")
+        load_last_population(path_to_population, save_model_str, population, population_number)
 
     use_size = True
-    for g in range(num_generations):
+    for g in range(population_number + 1,num_generations):
         if time.time() - start >= 86400:
             population.plot_pareto_set(population.compute_pareto_set(), g)
             break
@@ -359,7 +424,6 @@ def main(data_dir,
                            device,
                            save_model_str,
                            False)
-
         else:
             #pareto = list(map(lambda x: x, iter(population.compute_pareto_set())))
             for i in range(num_children):
@@ -441,6 +505,14 @@ if __name__ == "__main__":
                                 default=r'.\src\models',
                                 help='Path to store model',
                                 type=str)
+    cmdline_parser.add_argument('-p', '--path_to_pop',
+                                default=r'.\src\models',
+                                help='Path to stored last population (only folder)',
+                                type=str)
+    cmdline_parser.add_argument('-n', '--pop_num',
+                                default=9,
+                                help='Number of last population',
+                                type=str)
     cmdline_parser.add_argument('-v', '--verbose',
                                 default='INFO',
                                 choices=['INFO', 'DEBUG'],
@@ -462,5 +534,7 @@ if __name__ == "__main__":
         num_generations=args.generations,
         learning_rate=args.learning_rate,
         data_augmentations=None,  # Not set in this example
-        save_model_str=args.model_path
+        save_model_str=args.model_path,
+        path_to_population=args.path_to_pop,
+        population_number=args.pop_num
     )

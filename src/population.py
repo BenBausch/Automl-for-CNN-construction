@@ -14,15 +14,25 @@ class Candidate():
     Wrapper class for the Cnn models.
     """
     _num_candidates = count(0)
+    _ids_set_after_crash = count(0)
 
-    def __init__(self, score, size, config, model, HV):
-        self.id = next(self._num_candidates)
+    def __init__(self, score, size, config, model, HV, default=None, id=None, max_id=0):
+        if not(id is None):
+            self.id = id
+            if next(self._ids_set_after_crash) == 0:
+                for i in range(max_id):
+                    print(next(self._num_candidates))
+                self._ids_set_after_crash = True
+        else:
+            self.id = next(self._num_candidates)
+            print("ID :" + str(self.id))
         self.score = score
         self.size = size
-        self.model = model
+        # now set to none since not not needed
+        self.model = None
         self.init_configuration(config)
         self.config = config
-        self.default = None
+        self.default = default
         self.HV = HV
 
     def __dict__(self):
@@ -69,6 +79,8 @@ class Population():
         self.randomize = False
         self.generations_since_last_change_pareto = 0
         self.HV = 0
+        self.default = None
+
 
     def __dict__(self):
         d = {}

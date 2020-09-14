@@ -9,12 +9,12 @@ Two baselines were given: orange baseline with hypervolume of  and the red basel
 ## My Approach
 
 I have choosen an evolutionary algorithm with 2 kinds of parent selection and multiple different recombination and mutation strategies to produce offspring.
-The first sampling algorithm did sample a tournemant group from a distibution proportional to the inverse size (smallest network more likely) and 
+The first sampling algorithm did sample a tournamant group from a distibution proportional to the inverse size (smaller network more likely) and 
 then selected the best performing model as parent. The second parent selection algorithm did sample parents proportional to the hypervolume of the individual point w.r.t the same 
 reference point, thereby optimizing both cost functions at the same time. Training was done using early stopping with a patience of 10, so good configurations were very unlikely to stop too early.
 
 ## Results
 
-My algorithm found configurations strong then both baselines. Only for very small networks the performances of the baselines were better.
+My algorithm found configurations stronger then both baselines. Only for very small networks the performances of the baselines were better (might have been covered if algorithm ran more generationsm current runtime +- 3 hours)
 In the following, you can see the performance of my algorithm over a time span of 31 episodes (episode 9 is actually episode 10, this was due to a out of memory error):
  ![alt-text](https://github.com/BenBausch/Automl-for-CNN-construction/blob/master/src/pareto_fronts/pareto_fronts.gif)

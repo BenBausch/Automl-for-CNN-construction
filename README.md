@@ -18,3 +18,7 @@ reference point, thereby optimizing both cost functions at the same time. Traini
 My algorithm found configurations stronger then both baselines. Only for very small networks the performances of the baselines were better (might have been covered if algorithm ran more generationsm current runtime +- 3 hours)
 In the following, you can see the performance of my algorithm over a time span of 31 episodes (episode 9 is actually episode 10, this was due to a out of memory error):
  ![alt-text](https://github.com/BenBausch/Automl-for-CNN-construction/blob/master/src/pareto_fronts/pareto_fronts.gif)
+ 
+ ## Notice !
+ 
+ The spilt in validation and training set is the same for all the different models and there is no outter validation in the outter loop of the hpo problem. This yields a biased estimate of the validation accuracy (maybe fitting to the validation setm due to using the sets for cv of the models). The same problem applies to the baselines. For further experiments the dataset should be split in inner_dataset for inner_training and inner_validation and outter_validation_set for validation in the evolutionary outter loop.

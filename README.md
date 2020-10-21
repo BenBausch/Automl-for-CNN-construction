@@ -3,7 +3,7 @@
 ## What is this repo about
 
 This the final project of the automated machine learning class.
-The goal was find good CNN configurations in an automated fashion for a downsampled verison of the [flower dataset](http://www.robots.ox.ac.uk/~vgg/data/flowers/17/index.html)
+The goal was find good CNN configurations in an automated fashion for a downsampled verison of the [flower dataset](http://www.robots.ox.ac.uk/~vgg/data/flowers/17/index.html).
 Two baselines were given: orange baseline with hypervolume of  and the red baseline with a hypervolume of 
 
 ## My Approach
